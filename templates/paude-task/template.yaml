@@ -1,0 +1,119 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: paude-task
+  title: Paude Task
+  description: Create and register an agent task in RHDH.
+  tags: ["ai", "agent", "task", "paude"]
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+spec:
+  type: service
+  owner: rhdh-pai
+  parameters:
+    - title: Task Information
+      required:
+        - name
+        - owner
+        - description
+        - goals
+      properties:
+        name:
+          title: Name
+          type: string
+          description: Unique name for this task
+          ui:autofocus: true
+          ui:field: EntityNamePicker
+          maxLength: 63
+        owner:
+          title: Owner
+          type: string
+          description: Owner of the task
+          default: user:guest
+          ui:field: OwnerPicker
+          ui:options: {}
+        description:
+          title: Description
+          type: string
+          description: What this task is about
+          ui:widget: textarea
+          ui:options:
+            rows: 3
+        goals:
+          title: Goals
+          type: array
+          description: Ordered list of goals the agent must achieve
+          items:
+            type: string
+            title: Goal
+          ui:ArrayFieldTemplate: ArrayFieldTemplate
+        additionalContext:
+          title: Additional Context
+          type: array
+          description: Extra context lines to help the agent (optional)
+          items:
+            type: string
+            title: Context line
+          ui:ArrayFieldTemplate: ArrayFieldTemplate
+
+    - title: Repository Information
+      required:
+        - repoOwner
+        - repoName
+        - branch
+        - githubServer
+      properties:
+        githubServer:
+          title: GitHub Server
+          type: string
+          default: github.com
+          ui:help: "You can also provide an on-prem GitHub server, e.g. github.example.com"
+        repoOwner:
+          title: Repository Owner
+          type: string
+          ui:help: The organization or user that this repository will belong to
+        repoName:
+          title: Repository Name
+          type: string
+        branch:
+          title: Default Branch
+          type: string
+          default: main
+
+  steps:
+    - id: fetch-skeleton
+      name: Fetch Skeleton
+      action: fetch:template
+      input:
+        url: ./skeleton
+        values:
+          name: ${{ parameters.name }}
+          owner: ${{ parameters.owner }}
+          description: ${{ parameters.description }}
+          goals: ${{ parameters.goals }}
+          additionalContext: ${{ parameters.additionalContext }}
+
+    - id: publish-github
+      name: Publish Repository to GitHub
+      action: publish:github
+      input:
+        description: Paude task ${{ parameters.name }}
+        repoUrl: ${{ parameters.githubServer }}?owner=${{ parameters.repoOwner }}&repo=${{ parameters.repoName }}
+        defaultBranch: ${{ parameters.branch }}
+        protectDefaultBranch: false
+        repoVisibility: public
+
+    - id: register
+      name: Register
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps['publish-github'].output.repoContentsUrl }}
+        catalogInfoPath: /catalog-info.yaml
+
+  output:
+    links:
+      - title: Repository
+        url: ${{ steps['publish-github'].output.remoteUrl }}
+      - title: Open Task in Catalog
+        icon: catalog
+        entityRef: ${{ steps['register'].output.entityRef }}

@@ -1,0 +1,13 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: ${{ values.name }}
+  description: ${{ values.description }}
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+    paude.io/task-goals: "${{ values.goals | join('\n') }}"
+    paude.io/task-context: "${{ values.additionalContext | join('\n') }}"
+spec:
+  type: agent-task
+  owner: ${{ values.owner }}
+  lifecycle: experimental
