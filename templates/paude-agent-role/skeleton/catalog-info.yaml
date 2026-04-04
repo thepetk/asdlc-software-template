@@ -1,0 +1,13 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: ${{ values.name }}
+  description: ${{ values.description }}
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+    paude.io/role-title: ${{ values.title }}
+    paude.io/role-objectives: "${{ values.objectives | join('\n') }}"
+spec:
+  type: agent-role
+  owner: ${{ values.owner }}
+  lifecycle: experimental
