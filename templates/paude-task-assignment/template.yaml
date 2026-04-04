@@ -1,0 +1,140 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: paude-task-assignment
+  title: Paude Task Assignment
+  description: Assign an agent task to a Paude agent.
+  tags: ["ai", "agent", "task", "assignment", "paude"]
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+spec:
+  type: service
+  owner: rhdh-pai
+  parameters:
+    - title: Assignment
+      required:
+        - name
+        - owner
+        - agent
+        - task
+        - status
+      properties:
+        name:
+          title: Name
+          type: string
+          description: Unique name for this assignment
+          ui:autofocus: true
+          ui:field: EntityNamePicker
+          maxLength: 63
+        owner:
+          title: Owner
+          type: string
+          description: Owner of the assignment
+          default: user:guest
+          ui:field: OwnerPicker
+          ui:options: {}
+        agent:
+          title: Agent
+          type: string
+          description: The agent to assign the task to
+          ui:field: EntityPicker
+          ui:options:
+            catalogFilter:
+              - kind: Component
+                spec.type: agent
+            defaultKind: Component
+        task:
+          title: Task
+          type: string
+          description: The task to assign
+          ui:field: EntityPicker
+          ui:options:
+            catalogFilter:
+              - kind: Component
+                spec.type: agent-task
+            defaultKind: Component
+        status:
+          title: Status
+          type: string
+          description: Current status of the assignment
+          enum:
+            - todo
+            - in-progress
+            - done
+            - blocked
+          enumNames:
+            - To Do
+            - In Progress
+            - Done
+            - Blocked
+          default: todo
+        comment:
+          title: Comment
+          type: string
+          description: Extra context for the assignment (optional)
+          ui:widget: textarea
+          ui:options:
+            rows: 3
+
+    - title: Repository Information
+      required:
+        - repoOwner
+        - repoName
+        - branch
+        - githubServer
+      properties:
+        githubServer:
+          title: GitHub Server
+          type: string
+          default: github.com
+          ui:help: "You can also provide an on-prem GitHub server, e.g. github.example.com"
+        repoOwner:
+          title: Repository Owner
+          type: string
+          ui:help: The organization or user that this repository will belong to
+        repoName:
+          title: Repository Name
+          type: string
+        branch:
+          title: Default Branch
+          type: string
+          default: main
+
+  steps:
+    - id: fetch-skeleton
+      name: Fetch Skeleton
+      action: fetch:template
+      input:
+        url: ./skeleton
+        values:
+          name: ${{ parameters.name }}
+          owner: ${{ parameters.owner }}
+          agent: ${{ parameters.agent }}
+          task: ${{ parameters.task }}
+          status: ${{ parameters.status }}
+          comment: ${{ parameters.comment }}
+
+    - id: publish-github
+      name: Publish Repository to GitHub
+      action: publish:github
+      input:
+        description: Paude task assignment ${{ parameters.name }}
+        repoUrl: ${{ parameters.githubServer }}?owner=${{ parameters.repoOwner }}&repo=${{ parameters.repoName }}
+        defaultBranch: ${{ parameters.branch }}
+        protectDefaultBranch: false
+        repoVisibility: public
+
+    - id: register
+      name: Register
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps['publish-github'].output.repoContentsUrl }}
+        catalogInfoPath: /catalog-info.yaml
+
+  output:
+    links:
+      - title: Repository
+        url: ${{ steps['publish-github'].output.remoteUrl }}
+      - title: Open Assignment in Catalog
+        icon: catalog
+        entityRef: ${{ steps['register'].output.entityRef }}
