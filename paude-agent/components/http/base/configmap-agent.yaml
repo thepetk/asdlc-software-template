@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ${{ values.name }}-agent-config
+data:
+  PAUDE_AGENT_NAME: ${{ values.agentType }}
+  PAUDE_AGENT_ROLE: ${{ values.agentRole }}
+  PAUDE_ALLOWED_DOMAINS: ${{ values.allowedDomains }}

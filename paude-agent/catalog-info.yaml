@@ -1,0 +1,17 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: ${{ values.name }}
+  description: ${{ values.agentRole }}
+  annotations:
+    backstage.io/kubernetes-id: ${{ values.name }}
+    backstage.io/techdocs-ref: dir:.
+    argocd/app-selector: rhtap/gitops=${{ values.name }}
+    paude.io/agent-type: ${{ values.agentType }}
+    paude.io/agent-role: ${{ values.agentRole }}
+    paude.io/yolo: "${{ values.yoloMode }}"
+    paude.io/allowed-domains: ${{ values.allowedDomains }}
+spec:
+  type: agent
+  owner: ${{ values.owner }}
+  lifecycle: experimental

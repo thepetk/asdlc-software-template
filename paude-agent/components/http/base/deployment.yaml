@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${{ values.name }}
+  labels:
+    app: paude
+    paude.io/session-name: ${{ values.name }}
+    paude.io/agent: ${{ values.agentType }}
+    app.kubernetes.io/name: ${{ values.name }}
+    app.kubernetes.io/instance: ${{ values.name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: paude
+      paude.io/session-name: ${{ values.name }}
+  template:
+    metadata:
+      labels:
+        app: paude
+        paude.io/session-name: ${{ values.name }}
+        paude.io/agent: ${{ values.agentType }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      containers:
+        - name: paude
+          {%- if values.agentType == 'openclaw' %}
+          image: ghcr.io/openclaw/openclaw:latest
+          {%- else %}
+          image: quay.io/bbrowning/paude-base-centos10:0.15.0
+          {%- endif %}
+          imagePullPolicy: Always
+          command: ["tini", "--", "sleep", "infinity"]
+          env:
+            - name: PAUDE_WORKSPACE
+              value: /pvc/workspace
+            - name: PAUDE_AGENT_NAME
+              value: ${{ values.agentType }}
+            - name: PAUDE_SUPPRESS_PROMPTS
+              value: "1"
+            {%- if values.agentType in ['cursor', 'gemini', 'openclaw'] %}
+            - name: NODE_USE_ENV_PROXY
+              value: "1"
+            {%- endif %}
+            {%- if values.yoloMode and values.agentType == 'claude' %}
+            - name: PAUDE_AGENT_ARGS
+              value: "--dangerously-skip-permissions"
+            {%- endif %}
+          envFrom:
+            - secretRef:
+                name: ${{ values.apiKeySecretName }}
+          resources:
+            requests:
+              cpu: "1"
+              memory: "4Gi"
+            limits:
+              cpu: "4"
+              memory: "8Gi"
+          {%- if values.agentType == 'openclaw' %}
+          ports:
+            - name: web-ui
+              containerPort: 18789
+              protocol: TCP
+          {%- endif %}
+          volumeMounts:
+            - name: workspace
+              mountPath: /pvc
+            - name: credentials
+              mountPath: /credentials
+      volumes:
+        - name: workspace
+          persistentVolumeClaim:
+            claimName: ${{ values.name }}-workspace
+        - name: credentials
+          emptyDir:
+            medium: Memory
+            sizeLimit: 100Mi
