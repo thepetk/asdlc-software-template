@@ -2,6 +2,7 @@
 # Resources are overridden by --ci flag; values here are for rendering only.
 
 name: ci-agent
+owner: user:guest
 agentType: claude
 agentRole: "CI test agent"
 yoloMode: false
