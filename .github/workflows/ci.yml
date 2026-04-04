@@ -1,0 +1,64 @@
+name: Deploy Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  deploy-test:
+    name: "${{ matrix.agentType }}"
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        agentType: [claude, cursor, gemini, openclaw]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Start minikube
+        uses: medyagh/setup-minikube@e9e035a86bbc3caea26a450bd4dbf9d0c453682e # v0.0.21
+
+      - name: Install OpenShift Route CRD (openclaw only)
+        if: matrix.agentType == 'openclaw'
+        run: kubectl apply -f tests/openshift-route-crd.yaml
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.11"
+
+      - name: Install render script dependencies
+        run: pip install jinja2 pyyaml
+
+      - name: Render skeleton into CI manifests
+        run: |
+          python tests/render_skeleton.py \
+            --values tests/ci-values.yaml \
+            --set agentType=${{ matrix.agentType }} \
+            --set name=ci-${{ matrix.agentType }} \
+            --output /tmp/ci-manifests \
+            --ci
+
+      - name: Create dummy credentials secret
+        run: |
+          kubectl create secret generic ci-agent-secret \
+            --from-literal=ANTHROPIC_API_KEY=ci-test-key
+
+      - name: Apply manifests
+        run: |
+          kubectl apply -k /tmp/ci-manifests/components/ci-${{ matrix.agentType }}/overlays/development
+
+      - name: Wait for deployment to be ready
+        run: |
+          kubectl rollout status deployment/ci-${{ matrix.agentType }} --timeout=300s
+
+      - name: Show pod status on failure
+        if: failure()
+        run: |
+          kubectl get pods -l paude.io/session-name=ci-${{ matrix.agentType }}
+          kubectl describe deployment ci-${{ matrix.agentType }}
+          kubectl describe pods -l paude.io/session-name=ci-${{ matrix.agentType }}

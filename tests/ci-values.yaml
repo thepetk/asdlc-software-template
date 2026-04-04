@@ -1,0 +1,19 @@
+# Values used by scripts/render_skeleton.py to generate CI test manifests.
+# Resources are overridden by --ci flag; values here are for rendering only.
+
+name: ci-agent
+agentType: claude
+agentRole: "CI test agent"
+yoloMode: false
+allowedDomains: default
+apiKeySecretName: ci-agent-secret
+pvcSize: 1Gi
+
+# ArgoCD / GitOps values — rendered but not applied in CI
+namespace: default
+repoURL: https://github.com/example/ci-test
+argoNS: default
+argoProject: default
+argoComponentOverlays: ./components/ci-agent/overlays
+deployOnRemoteCluster: false
+remoteClusterAPIUri: ""
