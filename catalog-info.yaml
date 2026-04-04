@@ -1,0 +1,12 @@
+apiVersion: backstage.io/v1alpha1
+kind: Location
+metadata:
+  name: paude-software-templates
+  description: All Paude RHDH Software Templates
+spec:
+  targets:
+    - ./templates/paude-agent/template.yaml
+    - ./templates/paude-task/template.yaml
+    - ./templates/paude-agent-role/template.yaml
+    - ./templates/paude-agent-group/template.yaml
+    - ./templates/paude-task-assignment/template.yaml
