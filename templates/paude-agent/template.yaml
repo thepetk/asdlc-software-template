@@ -259,30 +259,35 @@ spec:
         repoUrl: https://${{ parameters.githubServer }}/${{ parameters.repoOwner }}/${{ parameters.repoName }}.git
         path: ./manifests
 
+    - id: fetch-pipeline-entry
+      name: Render Pipeline Entry
+      action: fetch:template
+      input:
+        url: ./pipeline-entry-skeleton
+        targetPath: pipeline-entry
+        values:
+          name: ${{ parameters.name }}
+          namespace: ${{ parameters.namespace }}
+          trigger: ${{ parameters.trigger }}
+          triggeredBy: ${{ parameters.triggeredBy }}
+          workBranch: ${{ steps['fetch-project-repo'].output.entity.spec.workBranch }}
+
     - id: register-in-pipeline
       name: Register Agent in Pipeline Config
       action: publish:github:pull-request
       input:
-        repoUrl: ${{ steps['fetch-project-repo'].output.entity.spec.repoUrl }}
+        repoUrl: ${{ steps['fetch-project-repo'].output.entity.spec.githubServer }}?owner=${{ steps['fetch-project-repo'].output.entity.spec.repoOwner }}&repo=${{ steps['fetch-project-repo'].output.entity.spec.repoName }}
         branchName: add-agent-${{ parameters.name }}
         title: "feat: register agent ${{ parameters.name }} in pipeline"
         description: |
-          Adds agent `${{ parameters.name }}` to `pipeline-config.yaml`.
+          Adds agent `${{ parameters.name }}` to the project pipeline.
 
           - trigger: `${{ parameters.trigger }}`
           - triggeredBy: `${{ parameters.triggeredBy }}`
-        content:
-          path: pipeline-config.yaml
-          action: append
-          text: |
-            - name: ${{ parameters.name }}
-              statefulset: ${{ parameters.name }}
-              namespace: ${{ parameters.namespace }}
-              trigger: ${{ parameters.trigger }}
-              {%- if parameters.triggeredBy %}
-              triggeredBy: ${{ parameters.triggeredBy }}
-              {%- endif %}
-              branch: ${{ steps['fetch-project-repo'].output.entity.spec.workBranch }}
+
+          Merge this PR to activate the agent in the Tekton pipeline.
+        sourcePath: pipeline-entry
+        targetPath: agents
 
   output:
     links:
@@ -291,3 +296,5 @@ spec:
       - title: Open Component in Catalog
         icon: catalog
         entityRef: ${{ steps['register'].output.entityRef }}
+      - title: Pipeline Registration PR
+        url: ${{ steps['register-in-pipeline'].output.remoteUrl }}

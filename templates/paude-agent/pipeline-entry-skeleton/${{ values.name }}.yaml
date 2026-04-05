@@ -1,0 +1,8 @@
+name: ${{ values.name }}
+statefulset: ${{ values.name }}
+namespace: ${{ values.namespace }}
+trigger: ${{ values.trigger }}
+{%- if values.triggeredBy %}
+triggeredBy: ${{ values.triggeredBy }}
+{%- endif %}
+branch: ${{ values.workBranch }}

@@ -89,19 +89,22 @@ spec:
                 exit 0
               fi
 
-              # Parse pipeline-config.yaml with python (available on the image)
+              # Parse agents/*.yaml files with python (available on the image)
               python3 - <<'PYEOF'
-              import yaml, sys, os
+              import yaml, sys, os, glob
 
-              config_path = "/workspace/source/pipeline-config.yaml"
+              agents_dir = "/workspace/source/agents"
               trigger_type = os.environ.get("TRIGGER_TYPE", "")
               pr_number = os.environ.get("PR_NUMBER", "")
               source_branch = os.environ.get("SOURCE_BRANCH", "")
 
-              with open(config_path) as f:
-                  config = yaml.safe_load(f) or {}
+              agents = []
+              for path in sorted(glob.glob(f"{agents_dir}/*.yaml")):
+                  with open(path) as f:
+                      agent = yaml.safe_load(f)
+                      if agent:
+                          agents.append(agent)
 
-              agents = config.get("agents", [])
               matched = None
               for agent in agents:
                   if agent.get("trigger") == trigger_type:

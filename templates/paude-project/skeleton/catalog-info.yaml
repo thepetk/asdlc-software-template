@@ -11,3 +11,6 @@ spec:
   lifecycle: experimental
   workBranch: ${{ values.workBranch }}
   repoUrl: https://${{ values.githubServer }}/${{ values.repoOwner }}/${{ values.name }}
+  githubServer: ${{ values.githubServer }}
+  repoOwner: ${{ values.repoOwner }}
+  repoName: ${{ values.name }}
