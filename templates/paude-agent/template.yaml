@@ -195,6 +195,7 @@ spec:
       action: fetch:template
       input:
         url: ./skeleton
+        targetPath: gitops
         values:
           name: ${{ parameters.name }}
           owner: ${{ parameters.owner }}
@@ -230,6 +231,7 @@ spec:
       name: Publish GitOps Repository to GitHub
       action: publish:github
       input:
+        sourcePath: gitops
         description: GitOps repository for Paude agent ${{ parameters.name }}
         repoUrl: ${{ parameters.githubServer }}?owner=${{ parameters.repoOwner }}&repo=${{ parameters.repoName }}
         defaultBranch: ${{ parameters.branch }}
@@ -271,6 +273,14 @@ spec:
           trigger: ${{ parameters.trigger }}
           triggeredBy: ${{ parameters.triggeredBy }}
           workBranch: ${{ steps['fetch-project-repo'].output.entity.spec.workBranch }}
+
+    - id: rename-pipeline-entry
+      name: Rename Pipeline Entry File
+      action: fs:rename
+      input:
+        files:
+          - from: pipeline-entry/agent.yaml
+            to: pipeline-entry/${{ parameters.name }}.yaml
 
     - id: register-in-pipeline
       name: Register Agent in Pipeline Config
