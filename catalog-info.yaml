@@ -9,3 +9,4 @@ spec:
     - ./templates/paude-task/template.yaml
     - ./templates/paude-agent-role/template.yaml
     - ./templates/paude-project/template.yaml
+    - ./examples/*/catalog-info.yaml

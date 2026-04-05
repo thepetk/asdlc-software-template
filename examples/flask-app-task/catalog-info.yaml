@@ -1,0 +1,23 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: flask-app-task
+  description: Create a simple Python Flask application
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+spec:
+  type: paude-task
+  owner: user:guest
+  lifecycle: experimental
+  title: Create a Simple Python Flask Application
+  description: Implement a minimal Python Flask web application with a health endpoint and basic project structure.
+  objectives:
+    - Create a Flask app with a `/health` endpoint that returns `{"status": "ok"}`
+    - Add a `requirements.txt` with pinned dependencies
+    - Add a `README.md` with instructions on how to run the app locally
+    - Write at least one pytest test covering the `/health` endpoint
+  acceptanceCriteria:
+    - The app starts without errors with `flask run`
+    - `GET /health` returns HTTP 200 and `{"status": "ok"}`
+    - `pytest` passes with no failures
+    - No unused imports or dependencies

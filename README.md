@@ -25,7 +25,7 @@ Agentic Software Development Lifecycle Software Templates based on [Paude](https
 
 The templates are designed to be used in this order:
 
-#### 1. Create a Paude Project Repository
+#### Create a Paude Project Repository
 
 Run the **Paude Project Repository** template. It will:
 
@@ -34,14 +34,18 @@ Run the **Paude Project Repository** template. It will:
 3. Register the project as a `paude-project` component in the RHDH catalog
 4. Create an ArgoCD application that keeps the Tekton resources in sync via GitOps
 
-#### 2. Create Roles and Tasks
+#### Create Roles and Tasks
 
 Use these templates to define the building blocks for agents:
 
 - **Paude Agent Role** — define a persona with a full system prompt and agent type (`claude`, `gemini`, or `cursor`)
 - **Paude Task** — define a unit of work with objectives and acceptance criteria
 
-#### 3. Create Paude Agents
+Both templates open a pull request that adds a `catalog-info.yaml` under `examples/<name>/` in the catalog repository you specify. Once the PR is merged, the entity is automatically discovered and available in RHDH - no separate GitHub repository is created.
+
+> **Tip:** The `examples/` directory in this repo contains ready-to-use roles and tasks you can import directly instead of running the templates from scratch. See [examples/](#examples) below.
+
+#### Create Paude Agents
 
 Run the **Paude Agent** template for each agent in the workflow. It will:
 
@@ -78,6 +82,17 @@ Each `paude-agent` declares a `trigger` and optionally a `triggeredBy` agent. Th
 | `pr-opened`     | When the `triggeredBy` agent opens a pull request            |
 | `ci-passed`     | When CI passes on the `triggeredBy` agent's PR (recommended) |
 | `pr-merged`     | When the `triggeredBy` agent's PR is merged                  |
+
+## Examples
+
+Ready-to-use roles and tasks live under `examples/`. They are registered automatically via the `./examples/*/catalog-info.yaml` glob in the root `catalog-info.yaml`.
+
+| Example                                                                       | Type               | Description                                                                 |
+| ----------------------------------------------------------------------------- | ------------------ | --------------------------------------------------------------------------- |
+| [`software-engineer-role`](examples/software-engineer-role/catalog-info.yaml) | `paude-agent-role` | Claude Code agent that writes code, tests, and opens PRs                    |
+| [`flask-app-task`](examples/flask-app-task/catalog-info.yaml)                 | `paude-task`       | Build a minimal Python Flask app with a `/health` endpoint and pytest tests |
+
+To add your own, either run the **Paude Agent Role** / **Paude Task** template (opens a PR automatically) or manually create `examples/<name>/catalog-info.yaml` and open a PR to this repo.
 
 ## Contributing
 

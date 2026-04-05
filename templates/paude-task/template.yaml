@@ -23,7 +23,7 @@ spec:
         name:
           title: Name
           type: string
-          description: Unique name for this task
+          description: Unique name for this task (e.g. implement-feature-x)
           ui:autofocus: true
           ui:field: EntityNamePicker
           maxLength: 63
@@ -62,29 +62,25 @@ spec:
             title: Criterion
           ui:ArrayFieldTemplate: ArrayFieldTemplate
 
-    - title: Repository Information
+    - title: Catalog Repository
+      description: The task's catalog-info.yaml will be added to this repository via a pull request. Once merged, the task becomes available in the RHDH catalog.
       required:
-        - repoOwner
-        - repoName
-        - branch
-        - githubServer
+        - catalogRepoOwner
+        - catalogRepoName
+        - catalogGithubServer
       properties:
-        githubServer:
+        catalogGithubServer:
           title: GitHub Server
           type: string
           default: github.com
-          ui:help: "You can also provide an on-prem GitHub server, e.g. github.example.com"
-        repoOwner:
+        catalogRepoOwner:
           title: Repository Owner
           type: string
-          ui:help: The organization or user that this repository will belong to
-        repoName:
+          description: Owner of the catalog repository
+        catalogRepoName:
           title: Repository Name
           type: string
-        branch:
-          title: Default Branch
-          type: string
-          default: main
+          description: Name of the catalog repository (e.g. paude-software-template)
 
   steps:
     - id: fetch-skeleton
@@ -100,27 +96,21 @@ spec:
           objectives: ${{ parameters.objectives }}
           acceptanceCriteria: ${{ parameters.acceptanceCriteria }}
 
-    - id: publish-github
-      name: Publish Repository to GitHub
-      action: publish:github
+    - id: publish-pr
+      name: Open Pull Request
+      action: publish:github:pull-request
       input:
-        description: Paude task ${{ parameters.name }}
-        repoUrl: ${{ parameters.githubServer }}?owner=${{ parameters.repoOwner }}&repo=${{ parameters.repoName }}
-        defaultBranch: ${{ parameters.branch }}
-        protectDefaultBranch: false
-        repoVisibility: public
+        repoUrl: ${{ parameters.catalogGithubServer }}?owner=${{ parameters.catalogRepoOwner }}&repo=${{ parameters.catalogRepoName }}
+        branchName: add-task-${{ parameters.name }}
+        title: "feat: add task ${{ parameters.name }}"
+        description: |
+          Adds the **${{ parameters.title }}** task to the catalog.
 
-    - id: register
-      name: Register
-      action: catalog:register
-      input:
-        repoContentsUrl: ${{ steps['publish-github'].output.repoContentsUrl }}
-        catalogInfoPath: /catalog-info.yaml
+          Merge this PR to make the task available in RHDH.
+        sourcePath: .
+        targetPath: examples/${{ parameters.name }}
 
   output:
     links:
-      - title: Repository
-        url: ${{ steps['publish-github'].output.remoteUrl }}
-      - title: Open Task in Catalog
-        icon: catalog
-        entityRef: ${{ steps['register'].output.entityRef }}
+      - title: Open Pull Request
+        url: ${{ steps['publish-pr'].output.remoteUrl }}
