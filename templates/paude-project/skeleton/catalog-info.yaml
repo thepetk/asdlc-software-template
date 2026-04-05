@@ -5,10 +5,9 @@ metadata:
   description: ${{ values.description }}
   annotations:
     backstage.io/techdocs-ref: dir:.
-    paude.io/group-title: ${{ values.title }}
-    paude.io/group-objectives: "${{ values.objectives | join('\n') }}"
-    paude.io/group-agents: "${{ values.agents | join(',') }}"
 spec:
-  type: agent-group
+  type: paude-project
   owner: ${{ values.owner }}
   lifecycle: experimental
+  workBranch: ${{ values.workBranch }}
+  repoUrl: https://${{ values.githubServer }}/${{ values.repoOwner }}/${{ values.name }}

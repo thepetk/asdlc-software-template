@@ -2,16 +2,19 @@ apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
   name: ${{ values.name }}
-  description: ${{ values.agentRole }}
+  description: Paude agent session bound to task ${{ values.task }} and role ${{ values.role }}
   annotations:
     backstage.io/kubernetes-id: ${{ values.name }}
     backstage.io/techdocs-ref: dir:.
-    argocd/app-selector: rhtap/gitops=${{ values.name }}
+    argocd/app-selector: app.kubernetes.io/part-of=${{ values.name }}
     paude.io/agent-type: ${{ values.agentType }}
-    paude.io/agent-role: ${{ values.agentRole }}
-    paude.io/yolo: "${{ values.yoloMode }}"
+    paude.io/yolo: "${{ values.yolo }}"
     paude.io/allowed-domains: ${{ values.allowedDomains }}
 spec:
-  type: agent
+  type: paude-agent
   owner: ${{ values.owner }}
   lifecycle: experimental
+  dependsOn:
+    - component:${{ values.task }}
+    - component:${{ values.role }}
+    - component:${{ values.projectRepo }}

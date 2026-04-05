@@ -1,0 +1,250 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: ${{ values.name }}-pipeline
+  namespace: ${{ values.argoNS }}
+spec:
+  params:
+    - name: gitRevision
+      type: string
+    - name: gitRepository
+      type: string
+    - name: eventType
+      type: string
+      description: "GitHub event type: push, pull_request, check_suite"
+    - name: prNumber
+      type: string
+      default: ""
+    - name: sourceBranch
+      type: string
+      default: ""
+    - name: targetBranch
+      type: string
+      default: ""
+    - name: prAction
+      type: string
+      default: ""
+    - name: checkSuiteConclusion
+      type: string
+      default: ""
+  workspaces:
+    - name: source
+  tasks:
+    - name: clone
+      taskRef:
+        name: git-clone
+        kind: ClusterTask
+      params:
+        - name: url
+          value: $(params.gitRepository)
+        - name: revision
+          value: $(params.gitRevision)
+      workspaces:
+        - name: output
+          workspace: source
+
+    - name: resolve-next
+      runAfter: [clone]
+      taskSpec:
+        params:
+          - name: eventType
+          - name: prAction
+          - name: checkSuiteConclusion
+          - name: sourceBranch
+          - name: prNumber
+        results:
+          - name: agentName
+            description: Name of the agent to trigger, or empty if none
+          - name: agentNamespace
+            description: Namespace of the agent to trigger
+          - name: agentStatefulset
+            description: StatefulSet name of the agent to trigger
+        steps:
+          - name: resolve
+            image: quay.io/openshift/origin-cli:latest
+            script: |
+              #!/usr/bin/env bash
+              set -euo pipefail
+
+              CONFIG=/workspace/source/pipeline-config.yaml
+
+              # Determine the effective trigger type from the GitHub event
+              EVENT="$(params.eventType)"
+              CONCLUSION="$(params.checkSuiteConclusion)"
+              ACTION="$(params.prAction)"
+
+              if [[ "$EVENT" == "push" ]]; then
+                TRIGGER_TYPE="push"
+              elif [[ "$EVENT" == "pull_request" && "$ACTION" == "opened" ]]; then
+                TRIGGER_TYPE="pr-opened"
+              elif [[ "$EVENT" == "pull_request" && "$ACTION" == "closed" ]]; then
+                TRIGGER_TYPE="pr-merged"
+              elif [[ "$EVENT" == "check_suite" && "$CONCLUSION" == "success" ]]; then
+                TRIGGER_TYPE="ci-passed"
+              else
+                echo "No matching trigger type for event=$EVENT action=$ACTION conclusion=$CONCLUSION"
+                printf "" > $(results.agentName.path)
+                printf "" > $(results.agentNamespace.path)
+                printf "" > $(results.agentStatefulset.path)
+                exit 0
+              fi
+
+              # Parse pipeline-config.yaml with python (available on the image)
+              python3 - <<'PYEOF'
+              import yaml, sys, os
+
+              config_path = "/workspace/source/pipeline-config.yaml"
+              trigger_type = os.environ.get("TRIGGER_TYPE", "")
+              pr_number = os.environ.get("PR_NUMBER", "")
+              source_branch = os.environ.get("SOURCE_BRANCH", "")
+
+              with open(config_path) as f:
+                  config = yaml.safe_load(f) or {}
+
+              agents = config.get("agents", [])
+              matched = None
+              for agent in agents:
+                  if agent.get("trigger") == trigger_type:
+                      matched = agent
+                      break
+
+              if matched:
+                  print(f"Matched agent: {matched['name']}")
+                  with open(os.environ["AGENT_NAME_PATH"], "w") as f:
+                      f.write(matched["name"])
+                  with open(os.environ["AGENT_NS_PATH"], "w") as f:
+                      f.write(matched.get("namespace", ""))
+                  with open(os.environ["AGENT_SS_PATH"], "w") as f:
+                      f.write(matched.get("statefulset", matched["name"]))
+              else:
+                  print(f"No agent matched trigger={trigger_type}")
+                  for path in [os.environ["AGENT_NAME_PATH"], os.environ["AGENT_NS_PATH"], os.environ["AGENT_SS_PATH"]]:
+                      open(path, "w").close()
+              PYEOF
+            env:
+              - name: TRIGGER_TYPE
+                value: "$(params.eventType)"
+              - name: PR_NUMBER
+                value: "$(params.prNumber)"
+              - name: SOURCE_BRANCH
+                value: "$(params.sourceBranch)"
+              - name: AGENT_NAME_PATH
+                value: $(results.agentName.path)
+              - name: AGENT_NS_PATH
+                value: $(results.agentNamespace.path)
+              - name: AGENT_SS_PATH
+                value: $(results.agentStatefulset.path)
+      workspaces:
+        - name: source
+          workspace: source
+      params:
+        - name: eventType
+          value: $(params.eventType)
+        - name: prAction
+          value: $(params.prAction)
+        - name: checkSuiteConclusion
+          value: $(params.checkSuiteConclusion)
+        - name: sourceBranch
+          value: $(params.sourceBranch)
+        - name: prNumber
+          value: $(params.prNumber)
+
+    - name: inject-context
+      runAfter: [resolve-next]
+      when:
+        - input: $(tasks.resolve-next.results.agentName)
+          operator: notin
+          values: [""]
+      taskSpec:
+        params:
+          - name: agentName
+          - name: agentNamespace
+          - name: agentStatefulset
+          - name: prNumber
+          - name: sourceBranch
+        steps:
+          - name: patch
+            image: quay.io/openshift/origin-cli:latest
+            script: |
+              #!/usr/bin/env bash
+              set -euo pipefail
+
+              AGENT_ARGS="-p \"Read TASK.md."
+              if [[ -n "$(params.prNumber)" ]]; then
+                AGENT_ARGS="${AGENT_ARGS} The upstream PR is #$(params.prNumber) on $(params.sourceBranch)."
+              fi
+              AGENT_ARGS="${AGENT_ARGS}\" --dangerously-skip-permissions"
+
+              oc patch statefulset "$(params.agentStatefulset)" \
+                -n "$(params.agentNamespace)" \
+                --type=merge \
+                -p "{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"agent\",\"env\":[{\"name\":\"PAUDE_AGENT_ARGS\",\"value\":\"${AGENT_ARGS}\"}]}]}}}}"
+      params:
+        - name: agentName
+          value: $(tasks.resolve-next.results.agentName)
+        - name: agentNamespace
+          value: $(tasks.resolve-next.results.agentNamespace)
+        - name: agentStatefulset
+          value: $(tasks.resolve-next.results.agentStatefulset)
+        - name: prNumber
+          value: $(params.prNumber)
+        - name: sourceBranch
+          value: $(params.sourceBranch)
+
+    - name: start-agent
+      runAfter: [inject-context]
+      when:
+        - input: $(tasks.resolve-next.results.agentName)
+          operator: notin
+          values: [""]
+      taskSpec:
+        params:
+          - name: agentStatefulset
+          - name: agentNamespace
+        steps:
+          - name: scale
+            image: quay.io/openshift/origin-cli:latest
+            script: |
+              #!/usr/bin/env bash
+              set -euo pipefail
+              oc scale statefulset/"$(params.agentStatefulset)" \
+                -n "$(params.agentNamespace)" \
+                --replicas=1
+      params:
+        - name: agentStatefulset
+          value: $(tasks.resolve-next.results.agentStatefulset)
+        - name: agentNamespace
+          value: $(tasks.resolve-next.results.agentNamespace)
+
+    - name: notify
+      runAfter: [start-agent]
+      when:
+        - input: $(tasks.resolve-next.results.agentName)
+          operator: notin
+          values: [""]
+      taskSpec:
+        params:
+          - name: agentName
+          - name: eventType
+          - name: prNumber
+          - name: sourceBranch
+        steps:
+          - name: post-webhook
+            image: quay.io/curl/curl:latest
+            script: |
+              #!/usr/bin/env sh
+              set -eu
+              echo "Paude pipeline notification:"
+              echo "  event:   $(params.eventType)"
+              echo "  branch:  $(params.sourceBranch)"
+              echo "  PR:      $(params.prNumber)"
+              echo "  started: $(params.agentName)"
+      params:
+        - name: agentName
+          value: $(tasks.resolve-next.results.agentName)
+        - name: eventType
+          value: $(params.eventType)
+        - name: prNumber
+          value: $(params.prNumber)
+        - name: sourceBranch
+          value: $(params.sourceBranch)

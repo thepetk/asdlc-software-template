@@ -16,8 +16,8 @@ spec:
         - name
         - owner
         - title
-        - description
-        - objectives
+        - agentType
+        - systemPrompt
       properties:
         name:
           title: Name
@@ -36,22 +36,27 @@ spec:
         title:
           title: Role Title
           type: string
-          description: Human-readable title for this role (e.g. "DevOps Expert")
-        description:
-          title: Description
+          description: Human-readable title for this role (e.g. "Software Engineer")
+        agentType:
+          title: Agent Type
           type: string
-          description: Overview of what this role is responsible for
+          description: The AI agent that will use this role
+          enum:
+            - claude
+            - gemini
+            - cursor
+          enumNames:
+            - Claude Code
+            - Gemini CLI
+            - Cursor
+          default: claude
+        systemPrompt:
+          title: System Prompt
+          type: string
+          description: The full system prompt / persona instructions for the agent
           ui:widget: textarea
           ui:options:
-            rows: 3
-        objectives:
-          title: Objectives
-          type: array
-          description: List of objectives this role must fulfil
-          items:
-            type: string
-            title: Objective
-          ui:ArrayFieldTemplate: ArrayFieldTemplate
+            rows: 10
 
     - title: Repository Information
       required:
@@ -87,8 +92,8 @@ spec:
           name: ${{ parameters.name }}
           owner: ${{ parameters.owner }}
           title: ${{ parameters.title }}
-          description: ${{ parameters.description }}
-          objectives: ${{ parameters.objectives }}
+          agentType: ${{ parameters.agentType }}
+          systemPrompt: ${{ parameters.systemPrompt }}
 
     - id: publish-github
       name: Publish Repository to GitHub

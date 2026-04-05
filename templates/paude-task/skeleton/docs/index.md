@@ -2,16 +2,14 @@
 
 ${{ values.description }}
 
-## Goals
+## Objectives
 
-{% for goal in values.goals %}
-- {{ goal }}
-{% endfor %}
+{%- for objective in values.objectives %}
+- {{ objective }}
+{%- endfor %}
 
-{% if values.additionalContext %}
-## Additional Context
+## Acceptance Criteria
 
-{% for line in values.additionalContext %}
-- {{ line }}
-{% endfor %}
-{% endif %}
+{%- for criterion in values.acceptanceCriteria %}
+- {{ criterion }}
+{%- endfor %}

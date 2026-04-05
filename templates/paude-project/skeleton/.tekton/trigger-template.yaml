@@ -1,0 +1,55 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: ${{ values.name }}-pipeline-trigger
+  namespace: ${{ values.argoNS }}
+spec:
+  params:
+    - name: gitRevision
+    - name: gitRepository
+    - name: eventType
+    - name: prNumber
+      default: ""
+    - name: sourceBranch
+      default: ""
+    - name: targetBranch
+      default: ""
+    - name: prAction
+      default: ""
+    - name: checkSuiteConclusion
+      default: ""
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1
+      kind: PipelineRun
+      metadata:
+        generateName: ${{ values.name }}-run-
+        namespace: ${{ values.argoNS }}
+      spec:
+        pipelineRef:
+          name: ${{ values.name }}-pipeline
+        params:
+          - name: gitRevision
+            value: $(tt.params.gitRevision)
+          - name: gitRepository
+            value: $(tt.params.gitRepository)
+          - name: eventType
+            value: $(tt.params.eventType)
+          - name: prNumber
+            value: $(tt.params.prNumber)
+          - name: sourceBranch
+            value: $(tt.params.sourceBranch)
+          - name: targetBranch
+            value: $(tt.params.targetBranch)
+          - name: prAction
+            value: $(tt.params.prAction)
+          - name: checkSuiteConclusion
+            value: $(tt.params.checkSuiteConclusion)
+        workspaces:
+          - name: source
+            volumeClaimTemplate:
+              spec:
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: 1Gi

@@ -1,7 +1,8 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: ${{ values.name }}
+  namespace: ${{ values.namespace }}
   labels:
     app: paude
     paude.io/session-name: ${{ values.name }}
@@ -9,7 +10,7 @@ metadata:
     app.kubernetes.io/name: ${{ values.name }}
     app.kubernetes.io/instance: ${{ values.name }}
 spec:
-  replicas: 1
+  replicas: 0
   selector:
     matchLabels:
       app: paude
@@ -24,12 +25,8 @@ spec:
       automountServiceAccountToken: false
       enableServiceLinks: false
       containers:
-        - name: paude
-          {%- if values.agentType == 'openclaw' %}
-          image: ghcr.io/openclaw/openclaw:latest
-          {%- else %}
-          image: quay.io/bbrowning/paude-base-centos10:0.15.0
-          {%- endif %}
+        - name: agent
+          image: ${{ values.name }}:latest
           imagePullPolicy: Always
           command: ["tini", "--", "sleep", "infinity"]
           env:
@@ -39,17 +36,21 @@ spec:
               value: ${{ values.agentType }}
             - name: PAUDE_SUPPRESS_PROMPTS
               value: "1"
-            {%- if values.agentType in ['cursor', 'gemini', 'openclaw'] %}
+            - name: PAUDE_WAIT_FOR_GIT
+              value: "1"
+            - name: PAUDE_ALLOWED_DOMAINS
+              value: ${{ values.allowedDomains }}
+            {%- if values.agentType in ['cursor', 'gemini'] %}
             - name: NODE_USE_ENV_PROXY
               value: "1"
             {%- endif %}
-            {%- if values.yoloMode and values.agentType == 'claude' %}
+            {%- if values.yolo %}
             - name: PAUDE_AGENT_ARGS
-              value: "--dangerously-skip-permissions"
+              value: '-p "$(cat /pvc/TASK.md)" --dangerously-skip-permissions'
+            {%- else %}
+            - name: PAUDE_AGENT_ARGS
+              value: '-p "$(cat /pvc/TASK.md)"'
             {%- endif %}
-          envFrom:
-            - secretRef:
-                name: ${{ values.apiKeySecretName }}
           resources:
             requests:
               cpu: "1"
@@ -57,12 +58,6 @@ spec:
             limits:
               cpu: "4"
               memory: "8Gi"
-          {%- if values.agentType == 'openclaw' %}
-          ports:
-            - name: web-ui
-              containerPort: 18789
-              protocol: TCP
-          {%- endif %}
           volumeMounts:
             - name: workspace
               mountPath: /pvc
@@ -76,3 +71,4 @@ spec:
           emptyDir:
             medium: Memory
             sizeLimit: 100Mi
+  volumeClaimTemplates: []

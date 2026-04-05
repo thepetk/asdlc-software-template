@@ -1,9 +1,7 @@
 # ${{ values.title }}
 
-${{ values.description }}
+**Agent Type:** ${{ values.agentType }}
 
-## Objectives
+## System Prompt
 
-{% for objective in values.objectives %}
-- {{ objective }}
-{% endfor %}
+${{ values.systemPrompt }}

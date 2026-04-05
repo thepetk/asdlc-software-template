@@ -3,16 +3,17 @@ kind: Application
 metadata:
   name: ${{ values.name }}
   namespace: ${{ values.argoNS }}
-  finalizers: ["resources-finalizer.argocd.argoproj.io"]
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
 spec:
   project: ${{ values.argoProject }}
   source:
-    path: ./app-of-apps
     repoURL: ${{ values.repoURL }}.git
-    targetRevision: main
+    targetRevision: ${{ values.branch }}
+    path: manifests
   destination:
-    namespace: ${{ values.namespace }}
     server: https://kubernetes.default.svc
+    namespace: ${{ values.namespace }}
   syncPolicy:
     managedNamespaceMetadata:
       labels:
@@ -23,3 +24,9 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - PruneLast=true
+  ignoreDifferences:
+    - group: apps
+      kind: StatefulSet
+      jsonPointers:
+        - /spec/replicas
+        - /spec/template/spec/containers/0/env

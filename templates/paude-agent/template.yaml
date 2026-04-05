@@ -3,26 +3,26 @@ kind: Template
 metadata:
   name: paude-agent
   title: Paude Agent
-  description: Deploy a containerized AI coding agent (Claude, Cursor, Gemini, or OpenClaw) on OpenShift using Paude.
-  tags: ["ai", "agent", "claude", "cursor", "gemini", "openclaw", "paude"]
+  description: Deploy a containerized AI coding agent on OpenShift. Binds a Role (persona), a Task (work to do), and a Paude Project Repository (shared git repo) together into a GitOps-managed paude session.
+  tags: ["ai", "agent", "claude", "cursor", "gemini", "paude"]
   annotations:
     backstage.io/techdocs-ref: dir:.
 spec:
   type: service
   owner: rhdh-pai
   parameters:
-    - title: Agent Information
+    - title: Agent Identity
       required:
         - name
         - owner
-        - agentType
-        - agentRole
-        - allowedDomains
+        - role
+        - task
+        - trigger
       properties:
         name:
           title: Name
           type: string
-          description: Unique name of the agent component
+          description: Session / agent name (e.g. agent-se-impl)
           ui:autofocus: true
           ui:field: EntityNamePicker
           maxLength: 63
@@ -33,57 +33,126 @@ spec:
           default: user:guest
           ui:field: OwnerPicker
           ui:options: {}
-        agentType:
-          title: Agent Type
+        role:
+          title: Role
           type: string
-          description: The AI coding agent to deploy
-          enum:
-            - claude
-            - cursor
-            - gemini
-            - openclaw
-          enumNames:
-            - Claude Code
-            - Cursor
-            - Gemini CLI
-            - OpenClaw
-          default: claude
-        agentRole:
-          title: Agent Role
-          type: string
-          description: Describe the agent's role and mission (e.g. "You are a DevOps expert. Help maintain and improve our CI/CD pipelines.")
-          ui:widget: textarea
+          description: Role component — drives system prompt and agent type
+          ui:field: EntityPicker
           ui:options:
-            rows: 4
-        yoloMode:
-          title: Enable Autonomous Mode (yolo)?
-          type: boolean
-          default: false
-          ui:help: "Enables --dangerously-skip-permissions for Claude Code. The agent will run without requiring approval for each action. Only applies to Claude."
+            catalogFilter:
+              kind: Component
+              spec.type: paude-agent-role
+        task:
+          title: Task
+          type: string
+          description: Task component — drives TASK.md and launch prompt
+          ui:field: EntityPicker
+          ui:options:
+            catalogFilter:
+              kind: Component
+              spec.type: paude-task
+        trigger:
+          title: Trigger
+          type: string
+          description: When this agent starts
+          enum:
+            - manual
+            - pr-opened
+            - ci-passed
+            - pr-merged
+          enumNames:
+            - Manual (user starts explicitly)
+            - PR Opened (upstream agent opens a PR)
+            - CI Passed (CI passes on upstream PR)
+            - PR Merged (upstream agent's PR is merged)
+          default: manual
+        triggeredBy:
+          title: Triggered By
+          type: string
+          description: "(Optional) Upstream agent whose event activates this one"
+          ui:field: EntityPicker
+          ui:options:
+            catalogFilter:
+              kind: Component
+              spec.type: paude-agent
+
+    - title: Shared Repository
+      required:
+        - projectRepo
+      properties:
+        projectRepo:
+          title: Paude Project Repository
+          type: string
+          description: The shared paude project repository all agents in this workflow write to
+          ui:field: EntityPicker
+          ui:options:
+            catalogFilter:
+              kind: Component
+              spec.type: paude-project
+
+    - title: OpenShift Deployment
+      required:
+        - namespace
+        - argoInstance
+        - argoNS
+        - argoProject
+        - pvcSize
+        - allowedDomains
+        - yolo
+        - githubServer
+        - repoOwner
+        - repoName
+        - branch
+      properties:
+        namespace:
+          title: Deployment Namespace
+          type: string
+          description: The OpenShift namespace where the agent will be deployed
+          default: rhdh-app
+          maxLength: 63
+        argoInstance:
+          title: ArgoCD Instance
+          type: string
+          description: The ArgoCD instance name configured in RHDH
+          default: default
+          maxLength: 63
+        argoNS:
+          title: ArgoCD Namespace
+          type: string
+          description: The namespace where the ArgoCD Application will be created
+          default: openshift-gitops
+          maxLength: 63
+        argoProject:
+          title: ArgoCD Project
+          type: string
+          description: The ArgoCD project name
+          default: default
+          maxLength: 63
+        pvcSize:
+          title: Workspace PVC Size
+          type: string
+          description: Size of the persistent volume for the agent's workspace
+          default: 10Gi
+          ui:help: "10Gi is sufficient for most projects."
+        storageClass:
+          title: Storage Class
+          type: string
+          description: "(Optional) Storage class override for the workspace PVC"
         allowedDomains:
           title: Allowed Network Domains
           type: string
           description: Space-separated list of allowed domain aliases for the agent's network proxy
           default: default
-          ui:help: "Built-in aliases: default, python, github, golang, nodejs, rust. Add custom domains as needed."
-
-    - title: Provider & Credentials
-      required:
-        - apiKeySecretName
-      properties:
-        apiKeySecretName:
-          title: Credentials Secret Name
+          ui:help: "Built-in aliases: default, python, github, golang, nodejs, rust."
+        extraPackages:
+          title: Extra OS Packages
           type: string
-          description: Name of the Kubernetes Secret in the target namespace that contains your API credentials
-          ui:help: "Pre-create this secret before running the template. All keys in the secret become environment variables in the container (e.g. ANTHROPIC_API_KEY for Claude, OPENAI_API_KEY for OpenClaw with OpenAI, CURSOR_API_KEY for Cursor)."
-
-    - title: Repository Information
-      required:
-        - repoOwner
-        - repoName
-        - branch
-        - githubServer
-      properties:
+          description: "(Optional) Space-separated OS packages to install into the agent container"
+        yolo:
+          title: Enable Autonomous Mode (yolo)?
+          type: boolean
+          default: true
+          ui:help: "Enables --dangerously-skip-permissions. The agent runs without requiring approval for each action."
         githubServer:
           title: GitHub Server
           type: string
@@ -92,117 +161,75 @@ spec:
         repoOwner:
           title: Repository Owner
           type: string
-          ui:help: The organization or user that this repository will belong to
+          ui:help: The organization or user that the GitOps repository will belong to
         repoName:
           title: Repository Name
           type: string
+          description: Name for the GitOps repository (e.g. paude-agent-se-gitops)
         branch:
           title: Default Branch
           type: string
           default: main
 
-    - title: Deployment Information
-      required:
-        - argoNS
-        - argoInstance
-        - argoProject
-        - namespace
-        - pvcSize
-      properties:
-        argoNS:
-          title: ArgoCD Namespace
-          type: string
-          description: The namespace where the ArgoCD Application will be created
-          default: openshift-gitops
-          maxLength: 63
-        argoInstance:
-          title: ArgoCD Instance
-          type: string
-          description: The ArgoCD instance name configured in RHDH
-          default: default
-          maxLength: 63
-        argoProject:
-          title: ArgoCD Project
-          type: string
-          description: The ArgoCD project name
-          default: default
-          maxLength: 63
-        namespace:
-          title: Deployment Namespace
-          type: string
-          description: The OpenShift namespace where the agent will be deployed
-          default: rhdh-app
-          maxLength: 63
-        pvcSize:
-          title: Workspace PVC Size
-          type: string
-          description: Size of the persistent volume for the agent's workspace
-          default: 10Gi
-          ui:help: "The agent's code workspace will be stored here. 10Gi is sufficient for most projects."
-        deployArgoCDApplicationOnRemoteCluster:
-          title: Deploy on Remote Cluster?
-          type: boolean
-          default: false
-          ui:help: "If selected, the agent will be deployed to a remote cluster. Ensure the remote cluster is already configured in RHDH."
-      dependencies:
-        deployArgoCDApplicationOnRemoteCluster:
-          oneOf:
-            - required:
-                - remoteClusterAPIUrl
-                - remoteClusterDeploymentNamespace
-              properties:
-                deployArgoCDApplicationOnRemoteCluster:
-                  const: true
-                remoteClusterAPIUrl:
-                  title: Remote Cluster API URL
-                  type: string
-                  ui:help: "Kube API URL of the remote cluster"
-                remoteClusterDeploymentNamespace:
-                  title: Remote Cluster Namespace
-                  type: string
-                  ui:help: "The namespace on the remote cluster where the agent will be deployed"
-            - properties:
-                deployArgoCDApplicationOnRemoteCluster:
-                  const: false
-
   steps:
+    - id: fetch-role
+      name: Fetch Role Entity
+      action: catalog:fetch
+      input:
+        entityRef: ${{ parameters.role }}
+
+    - id: fetch-task
+      name: Fetch Task Entity
+      action: catalog:fetch
+      input:
+        entityRef: ${{ parameters.task }}
+
+    - id: fetch-project-repo
+      name: Fetch Project Repository Entity
+      action: catalog:fetch
+      input:
+        entityRef: ${{ parameters.projectRepo }}
+
     - id: fetch-skeleton
       name: Fetch Skeleton
       action: fetch:template
       input:
         url: ./skeleton
-        targetPath: gitops
         values:
           name: ${{ parameters.name }}
           owner: ${{ parameters.owner }}
-          agentType: ${{ parameters.agentType }}
-          agentRole: ${{ parameters.agentRole }}
-          yoloMode: ${{ parameters.yoloMode }}
-          allowedDomains: ${{ parameters.allowedDomains }}
-          apiKeySecretName: ${{ parameters.apiKeySecretName }}
-          namespace: ${{ parameters.remoteClusterDeploymentNamespace if parameters.deployArgoCDApplicationOnRemoteCluster else parameters.namespace }}
-          repoURL: https://${{ parameters.githubServer }}/${{ parameters.repoOwner }}/${{ parameters.repoName }}
-          argoComponentOverlays: ./components/${{ parameters.name }}/overlays
+          role: ${{ parameters.role }}
+          task: ${{ parameters.task }}
+          projectRepo: ${{ parameters.projectRepo }}
+          trigger: ${{ parameters.trigger }}
+          triggeredBy: ${{ parameters.triggeredBy }}
+          # From catalog:fetch (role)
+          agentType: ${{ steps['fetch-role'].output.entity.spec.agentType }}
+          systemPrompt: ${{ steps['fetch-role'].output.entity.spec.systemPrompt }}
+          # From catalog:fetch (task)
+          taskTitle: ${{ steps['fetch-task'].output.entity.spec.title }}
+          taskDescription: ${{ steps['fetch-task'].output.entity.spec.description }}
+          taskObjectives: ${{ steps['fetch-task'].output.entity.spec.objectives }}
+          taskAcceptanceCriteria: ${{ steps['fetch-task'].output.entity.spec.acceptanceCriteria }}
+          # From catalog:fetch (projectRepo)
+          workBranch: ${{ steps['fetch-project-repo'].output.entity.spec.workBranch }}
+          projectRepoUrl: ${{ steps['fetch-project-repo'].output.entity.spec.repoUrl }}
+          # Deployment params
+          namespace: ${{ parameters.namespace }}
           argoNS: ${{ parameters.argoNS }}
           argoProject: ${{ parameters.argoProject }}
           pvcSize: ${{ parameters.pvcSize }}
-          deployOnRemoteCluster: ${{ parameters.deployArgoCDApplicationOnRemoteCluster }}
-          remoteClusterAPIUri: ${{ parameters.remoteClusterAPIUrl }}
-
-    - id: renameComponentDir
-      name: Rename Component Directory
-      action: fs:rename
-      input:
-        files:
-          - from: gitops/components/http
-            to: gitops/components/${{ parameters.name }}
-            overwrite: true
+          storageClass: ${{ parameters.storageClass }}
+          allowedDomains: ${{ parameters.allowedDomains }}
+          extraPackages: ${{ parameters.extraPackages }}
+          yolo: ${{ parameters.yolo }}
+          repoURL: https://${{ parameters.githubServer }}/${{ parameters.repoOwner }}/${{ parameters.repoName }}
+          branch: ${{ parameters.branch }}
 
     - id: publish-github
-      name: Publish Repository to GitHub
+      name: Publish GitOps Repository to GitHub
       action: publish:github
       input:
-        sourcePath: gitops
         description: GitOps repository for Paude agent ${{ parameters.name }}
         repoUrl: ${{ parameters.githubServer }}?owner=${{ parameters.repoOwner }}&repo=${{ parameters.repoName }}
         defaultBranch: ${{ parameters.branch }}
@@ -226,11 +253,36 @@ spec:
       name: Create ArgoCD Resources
       action: argocd:create-resources
       input:
-        appName: ${{ parameters.name }}-app-of-apps
+        appName: ${{ parameters.name }}
         argoInstance: ${{ parameters.argoInstance }}
         namespace: ${{ parameters.argoNS }}
         repoUrl: https://${{ parameters.githubServer }}/${{ parameters.repoOwner }}/${{ parameters.repoName }}.git
-        path: ./app-of-apps
+        path: ./manifests
+
+    - id: register-in-pipeline
+      name: Register Agent in Pipeline Config
+      action: publish:github:pull-request
+      input:
+        repoUrl: ${{ steps['fetch-project-repo'].output.entity.spec.repoUrl }}
+        branchName: add-agent-${{ parameters.name }}
+        title: "feat: register agent ${{ parameters.name }} in pipeline"
+        description: |
+          Adds agent `${{ parameters.name }}` to `pipeline-config.yaml`.
+
+          - trigger: `${{ parameters.trigger }}`
+          - triggeredBy: `${{ parameters.triggeredBy }}`
+        content:
+          path: pipeline-config.yaml
+          action: append
+          text: |
+            - name: ${{ parameters.name }}
+              statefulset: ${{ parameters.name }}
+              namespace: ${{ parameters.namespace }}
+              trigger: ${{ parameters.trigger }}
+              {%- if parameters.triggeredBy %}
+              triggeredBy: ${{ parameters.triggeredBy }}
+              {%- endif %}
+              branch: ${{ steps['fetch-project-repo'].output.entity.spec.workBranch }}
 
   output:
     links:

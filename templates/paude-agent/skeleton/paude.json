@@ -1,0 +1,4 @@
+{
+  "allowedDomains": "${{ values.allowedDomains }}",
+  "packages": "${{ values.extraPackages }}"
+}

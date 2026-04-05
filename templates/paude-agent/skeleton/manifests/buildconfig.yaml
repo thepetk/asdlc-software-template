@@ -1,0 +1,25 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: ${{ values.name }}
+  namespace: ${{ values.namespace }}
+  labels:
+    app: paude
+    paude.io/session-name: ${{ values.name }}
+spec:
+  source:
+    type: Git
+    git:
+      uri: ${{ values.repoURL }}
+      ref: ${{ values.branch }}
+    contextDir: build
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Dockerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: ${{ values.name }}:latest
+  triggers:
+    - type: ConfigChange

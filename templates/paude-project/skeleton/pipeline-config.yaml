@@ -1,0 +1,4 @@
+# Paude pipeline configuration for ${{ values.name }}
+# Each paude-agent template run appends one entry to this list.
+# The Tekton pipeline reads this file to determine which agent to trigger next.
+agents: []

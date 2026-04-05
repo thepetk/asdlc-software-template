@@ -1,20 +1,42 @@
-# Values used by scripts/render_skeleton.py to generate CI test manifests.
-# Resources are overridden by --ci flag; values here are for rendering only.
+# Values used by tests/render_skeleton.py to render and validate the paude-agent skeleton in CI.
+# These simulate the outputs that catalog:fetch would provide at runtime.
 
 name: ci-agent
 owner: user:guest
-agentType: claude
-agentRole: "CI test agent"
-yoloMode: false
+yolo: true
 allowedDomains: default
-apiKeySecretName: ci-agent-secret
 pvcSize: 1Gi
+storageClass: ""
+extraPackages: ""
+
+# Simulated catalog:fetch (role) outputs
+agentType: claude
+systemPrompt: "You are a CI test agent. Your job is to verify the template renders correctly."
+
+# Simulated catalog:fetch (task) outputs
+taskTitle: CI Test Task
+taskDescription: Run the CI rendering test to verify the skeleton renders without errors.
+taskObjectives:
+  - Render all skeleton files without Jinja2 errors
+  - Validate all rendered YAML files parse correctly
+taskAcceptanceCriteria:
+  - All YAML files are syntactically valid
+  - Rendered StatefulSet has replicas 0
+
+# Simulated catalog:fetch (projectRepo) outputs
+workBranch: feature/ci-test
+projectRepoUrl: https://github.com/example/ci-test-project
+
+# Catalog entity references (as they would appear from EntityPicker)
+role: component:default/ci-role
+task: component:default/ci-task
+projectRepo: component:default/ci-project
+trigger: manual
+triggeredBy: ""
 
 # ArgoCD / GitOps values — rendered but not applied in CI
 namespace: default
 repoURL: https://github.com/example/ci-test
+branch: main
 argoNS: default
 argoProject: default
-argoComponentOverlays: ./components/ci-agent/overlays
-deployOnRemoteCluster: false
-remoteClusterAPIUri: ""

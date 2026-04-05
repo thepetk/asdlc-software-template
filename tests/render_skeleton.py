@@ -14,10 +14,13 @@ CI_RESOURCES = {
     "limits": {"cpu": "500m", "memory": "256Mi"},
 }
 
+# Files rendered as Jinja2 templates (Backstage ${{ }} syntax)
+TEMPLATE_SUFFIXES = {".yaml", ".json", ".md", ".sh", ".conf"}
 
-def render(content: "str", values: "dict[str, str]") -> "str":
+
+def render(content: "str", values: "dict") -> "str":
     """
-    renders a Backstage skeleton file (${{ }}) as Jinja2.
+    Renders a Backstage skeleton file (${{ }}) as Jinja2.
     """
     content = content.replace("${{", "{{")
     env = jinja2.Environment(undefined=jinja2.StrictUndefined)
@@ -26,12 +29,29 @@ def render(content: "str", values: "dict[str, str]") -> "str":
 
 def patch_resources(rendered: "str") -> "str":
     """
-    replaces resource requests/limits in a Deployment with CI-safe values.
+    Replaces resource requests/limits in a StatefulSet with CI-safe values.
     """
     doc = yaml.safe_load(rendered)
-    for container in doc.get("spec", {}).get("template", {}).get("spec", {}).get("containers", []):
+    for container in (
+        doc.get("spec", {})
+        .get("template", {})
+        .get("spec", {})
+        .get("containers", [])
+    ):
         container["resources"] = CI_RESOURCES
     return yaml.dump(doc, default_flow_style=False)
+
+
+def validate_yaml(rendered: "str", rel: "Path") -> "bool":
+    """
+    Validates that rendered content is valid YAML. Returns True on success.
+    """
+    try:
+        list(yaml.safe_load_all(rendered))
+        return True
+    except yaml.YAMLError as exc:
+        print(f"  YAML ERROR in {rel}: {exc}", file=sys.stderr)
+        return False
 
 
 def main() -> None:
@@ -61,7 +81,6 @@ def main() -> None:
             print(f"ERROR: --set value must be KEY=VALUE, got: {override}", file=sys.stderr)
             sys.exit(1)
         key, val = override.split("=", 1)
-        # coerce "true"/"false" strings to booleans to match Jinja2 expectations
         if val.lower() == "true":
             val = True
         elif val.lower() == "false":
@@ -77,34 +96,43 @@ def main() -> None:
     if out.exists():
         shutil.rmtree(out)
 
-    for src in sorted(SKELETON.rglob("*.yaml")):
-        rel = src.relative_to(SKELETON)
+    errors = 0
+    for src in sorted(SKELETON.rglob("*")):
+        if not src.is_file():
+            continue
 
-        # rename components/http -> components/<name>
-        # this mirrors the fs:rename step functionality
-        parts = list(rel.parts)
-        if "http" in parts:
-            parts[parts.index("http")] = name
-        dst = out / Path(*parts)
+        rel = src.relative_to(SKELETON)
+        dst = out / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
 
         content = src.read_text()
-        try:
-            rendered = render(content, values)
-        except jinja2.UndefinedError as exc:
-            print(f"ERROR rendering {rel}: {exc}", file=sys.stderr)
-            sys.exit(1)
 
-        if args.ci and src.name == "deployment.yaml" and "kind: Deployment" in rendered:
-            rendered = patch_resources(rendered)
+        if src.suffix in TEMPLATE_SUFFIXES:
+            try:
+                rendered = render(content, values)
+            except jinja2.UndefinedError as exc:
+                print(f"ERROR rendering {rel}: {exc}", file=sys.stderr)
+                errors += 1
+                continue
 
-        dst.write_text(rendered)
-        print(f"  {rel} -> {Path(*parts)}")
+            if args.ci and src.suffix == ".yaml" and "kind: StatefulSet" in rendered:
+                rendered = patch_resources(rendered)
 
-    # overlay path for kubectl apply -k
-    overlay = out / "components" / name / "overlays" / "development"
+            if src.suffix == ".yaml" and not validate_yaml(rendered, rel):
+                errors += 1
+
+            dst.write_text(rendered)
+        else:
+            shutil.copy2(src, dst)
+
+        print(f"  {rel}")
+
     print(f"\nManifests written to: {out}")
-    print(f"Apply with:\n  kubectl apply -k {overlay}")
+    if errors:
+        print(f"\nERROR: {errors} file(s) had rendering or validation errors.", file=sys.stderr)
+        sys.exit(1)
+    else:
+        print("All files rendered and validated successfully.")
 
 
 if __name__ == "__main__":

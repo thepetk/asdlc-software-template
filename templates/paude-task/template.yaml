@@ -15,8 +15,10 @@ spec:
       required:
         - name
         - owner
+        - title
         - description
-        - goals
+        - objectives
+        - acceptanceCriteria
       properties:
         name:
           title: Name
@@ -32,6 +34,10 @@ spec:
           default: user:guest
           ui:field: OwnerPicker
           ui:options: {}
+        title:
+          title: Title
+          type: string
+          description: Human-readable title for this task (e.g. "Implement Feature X")
         description:
           title: Description
           type: string
@@ -39,21 +45,21 @@ spec:
           ui:widget: textarea
           ui:options:
             rows: 3
-        goals:
-          title: Goals
+        objectives:
+          title: Objectives
           type: array
-          description: Ordered list of goals the agent must achieve
+          description: Ordered list of objectives the agent must achieve
           items:
             type: string
-            title: Goal
+            title: Objective
           ui:ArrayFieldTemplate: ArrayFieldTemplate
-        additionalContext:
-          title: Additional Context
+        acceptanceCriteria:
+          title: Acceptance Criteria
           type: array
-          description: Extra context lines to help the agent (optional)
+          description: Conditions that must be met for the task to be considered complete
           items:
             type: string
-            title: Context line
+            title: Criterion
           ui:ArrayFieldTemplate: ArrayFieldTemplate
 
     - title: Repository Information
@@ -89,9 +95,10 @@ spec:
         values:
           name: ${{ parameters.name }}
           owner: ${{ parameters.owner }}
+          title: ${{ parameters.title }}
           description: ${{ parameters.description }}
-          goals: ${{ parameters.goals }}
-          additionalContext: ${{ parameters.additionalContext }}
+          objectives: ${{ parameters.objectives }}
+          acceptanceCriteria: ${{ parameters.acceptanceCriteria }}
 
     - id: publish-github
       name: Publish Repository to GitHub

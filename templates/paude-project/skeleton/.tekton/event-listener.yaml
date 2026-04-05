@@ -1,0 +1,43 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: ${{ values.name }}-github-listener
+  namespace: ${{ values.argoNS }}
+spec:
+  serviceAccountName: tekton-triggers-sa
+  triggers:
+    - name: github-push
+      interceptors:
+        - ref:
+            name: github
+          params:
+            - name: eventTypes
+              value: ["push"]
+      bindings:
+        - ref: ${{ values.name }}-github-binding
+      template:
+        ref: ${{ values.name }}-pipeline-trigger
+
+    - name: github-pull-request
+      interceptors:
+        - ref:
+            name: github
+          params:
+            - name: eventTypes
+              value: ["pull_request"]
+      bindings:
+        - ref: ${{ values.name }}-github-binding
+      template:
+        ref: ${{ values.name }}-pipeline-trigger
+
+    - name: github-check-suite
+      interceptors:
+        - ref:
+            name: github
+          params:
+            - name: eventTypes
+              value: ["check_suite"]
+      bindings:
+        - ref: ${{ values.name }}-github-binding
+      template:
+        ref: ${{ values.name }}-pipeline-trigger

@@ -1,0 +1,154 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: paude-project
+  title: Paude Project Repository
+  description: Create the shared GitHub repository that all paude agents in a workflow write to. Adds a Tekton pipeline to orchestrate agent sequencing on push and PR events.
+  tags: ["ai", "agent", "tekton", "gitops", "paude"]
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+spec:
+  type: service
+  owner: rhdh-pai
+  parameters:
+    - title: Project Information
+      required:
+        - name
+        - owner
+        - description
+        - workBranch
+      properties:
+        name:
+          title: Name
+          type: string
+          description: Project name (e.g. my-feature-project)
+          ui:autofocus: true
+          ui:field: EntityNamePicker
+          maxLength: 63
+        owner:
+          title: Owner
+          type: string
+          description: Owner of the project
+          default: user:guest
+          ui:field: OwnerPicker
+          ui:options: {}
+        description:
+          title: Description
+          type: string
+          description: Short description of the project
+        workBranch:
+          title: Work Branch
+          type: string
+          description: Shared working branch for all agents in this project (e.g. feature/my-feature)
+          ui:help: "All agents in this project will push commits to this branch."
+        existingRepoUrl:
+          title: Existing Repository URL
+          type: string
+          description: "(Optional) URL of an existing repository. If set, Tekton files are added via PR instead of creating a new repo."
+          ui:help: "Leave blank to create a new repository."
+
+    - title: Repository Information
+      required:
+        - repoOwner
+        - githubServer
+        - defaultBranch
+      properties:
+        githubServer:
+          title: GitHub Server
+          type: string
+          default: github.com
+          ui:help: "You can also provide an on-prem GitHub server, e.g. github.example.com"
+        repoOwner:
+          title: Repository Owner
+          type: string
+          ui:help: The organization or user that this repository will belong to
+        defaultBranch:
+          title: Default Branch
+          type: string
+          default: main
+
+    - title: Deployment Information
+      required:
+        - argoInstance
+        - argoNS
+      properties:
+        argoInstance:
+          title: ArgoCD Instance
+          type: string
+          description: The ArgoCD instance name configured in RHDH
+          default: default
+          maxLength: 63
+        argoNS:
+          title: ArgoCD Namespace
+          type: string
+          description: The namespace where the ArgoCD Application will be created
+          default: openshift-gitops
+          maxLength: 63
+
+  steps:
+    - id: fetch-skeleton
+      name: Fetch Skeleton
+      action: fetch:template
+      input:
+        url: ./skeleton
+        values:
+          name: ${{ parameters.name }}
+          owner: ${{ parameters.owner }}
+          description: ${{ parameters.description }}
+          workBranch: ${{ parameters.workBranch }}
+          defaultBranch: ${{ parameters.defaultBranch }}
+          repoOwner: ${{ parameters.repoOwner }}
+          githubServer: ${{ parameters.githubServer }}
+          argoNS: ${{ parameters.argoNS }}
+
+    - id: publish-github
+      name: Publish Repository to GitHub
+      if: ${{ not parameters.existingRepoUrl }}
+      action: publish:github
+      input:
+        description: ${{ parameters.description }}
+        repoUrl: ${{ parameters.githubServer }}?owner=${{ parameters.repoOwner }}&repo=${{ parameters.name }}
+        defaultBranch: ${{ parameters.defaultBranch }}
+        protectDefaultBranch: false
+        repoVisibility: public
+
+    - id: publish-github-pr
+      name: Open Pull Request on Existing Repository
+      if: ${{ parameters.existingRepoUrl }}
+      action: publish:github:pull-request
+      input:
+        repoUrl: ${{ parameters.existingRepoUrl }}
+        branchName: add-paude-tekton-pipeline
+        title: "feat: add Paude Tekton pipeline"
+        description: "Adds `.tekton/` pipeline and `pipeline-config.yaml` to activate the Paude multi-agent workflow."
+
+    - id: wait-for-github-repository
+      name: Waiting for Repository Availability
+      action: debug:wait
+      input:
+        seconds: 3
+
+    - id: register
+      name: Register
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps['publish-github'].output.repoContentsUrl if not parameters.existingRepoUrl else steps['publish-github-pr'].output.repoContentsUrl }}
+        catalogInfoPath: /catalog-info.yaml
+
+    - id: create-argocd-resources
+      name: Create ArgoCD Resources
+      action: argocd:create-resources
+      input:
+        appName: ${{ parameters.name }}-tekton
+        argoInstance: ${{ parameters.argoInstance }}
+        namespace: ${{ parameters.argoNS }}
+        repoUrl: https://${{ parameters.githubServer }}/${{ parameters.repoOwner }}/${{ parameters.name }}.git
+        path: ./.tekton
+
+  output:
+    links:
+      - title: Repository
+        url: ${{ steps['publish-github'].output.remoteUrl if not parameters.existingRepoUrl else parameters.existingRepoUrl }}
+      - title: Open Project in Catalog
+        icon: catalog
+        entityRef: ${{ steps['register'].output.entityRef }}
