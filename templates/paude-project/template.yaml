@@ -79,12 +79,6 @@ spec:
           description: The ArgoCD instance name configured in RHDH
           default: default
           maxLength: 63
-        argoProject:
-          title: ArgoCD Project
-          type: string
-          description: The ArgoCD project name
-          default: default
-          maxLength: 63
         argoNS:
           title: ArgoCD Namespace
           type: string
@@ -155,7 +149,7 @@ spec:
       input:
         appName: ${{ parameters.name }}-tekton
         argoInstance: ${{ parameters.argoInstance }}
-        projectName: ${{ parameters.argoProject }}
+        projectName: ${{ parameters.name }}-tekton
         namespace: ${{ parameters.argoNS }}
         repoUrl: https://${{ parameters.githubServer }}/${{ parameters.repoOwner }}/${{ parameters.name }}.git
         path: ./.tekton
