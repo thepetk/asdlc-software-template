@@ -2,7 +2,7 @@ apiVersion: triggers.tekton.dev/v1beta1
 kind: TriggerTemplate
 metadata:
   name: ${{ values.name }}-pipeline-trigger
-  namespace: ${{ values.argoNS }}
+  namespace: ${{ values.tektonNS }}
 spec:
   params:
     - name: gitRevision
@@ -23,7 +23,7 @@ spec:
       kind: PipelineRun
       metadata:
         generateName: ${{ values.name }}-run-
-        namespace: ${{ values.argoNS }}
+        namespace: ${{ values.tektonNS }}
       spec:
         pipelineRef:
           name: ${{ values.name }}-pipeline

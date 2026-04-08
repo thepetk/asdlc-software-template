@@ -251,19 +251,6 @@ spec:
         repoContentsUrl: ${{ steps['publish-github'].output.repoContentsUrl }}
         catalogInfoPath: /catalog-info.yaml
 
-    - id: init-namespace
-      name: Initialize Namespace
-      action: kubernetes:apply
-      input:
-        namespaced: false
-        manifest:
-          apiVersion: v1
-          kind: Namespace
-          metadata:
-            name: ${{ parameters.namespace }}
-            labels:
-              argocd.argoproj.io/managed-by: ${{ parameters.argoNS }}
-
     - id: create-argocd-resources
       name: Create ArgoCD Resources
       action: argocd:create-resources
@@ -274,6 +261,7 @@ spec:
         namespace: ${{ parameters.argoNS }}
         repoUrl: https://${{ parameters.githubServer }}/${{ parameters.repoOwner }}/${{ parameters.repoName }}.git
         path: ./manifests
+        destinationNamespace: ${{ parameters.namespace }}
 
     - id: fetch-pipeline-entry
       name: Render Pipeline Entry

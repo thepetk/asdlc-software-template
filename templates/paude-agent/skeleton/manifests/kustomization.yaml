@@ -3,6 +3,7 @@ kind: Kustomization
 commonLabels:
   app.kubernetes.io/part-of: ${{ values.name }}
 resources:
+  - namespace.yaml
   - imagestream.yaml
   - buildconfig.yaml
   - statefulset.yaml

@@ -2,7 +2,7 @@ apiVersion: triggers.tekton.dev/v1beta1
 kind: EventListener
 metadata:
   name: ${{ values.name }}-github-listener
-  namespace: ${{ values.argoNS }}
+  namespace: ${{ values.tektonNS }}
 spec:
   serviceAccountName: ${{ values.name }}-tekton-triggers-sa
   triggers:

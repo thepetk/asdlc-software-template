@@ -71,6 +71,7 @@ spec:
       required:
         - argoInstance
         - argoNS
+        - tektonNS
       properties:
         argoInstance:
           title: ArgoCD Instance
@@ -83,6 +84,12 @@ spec:
           type: string
           description: The namespace where the ArgoCD Application will be created
           default: openshift-gitops
+          maxLength: 63
+        tektonNS:
+          title: Tekton Namespace
+          type: string
+          description: The namespace where Tekton resources (EventListener, TriggerBinding, etc.) will be deployed
+          default: rhdh-app
           maxLength: 63
 
   steps:
@@ -100,6 +107,7 @@ spec:
           repoOwner: ${{ parameters.repoOwner }}
           githubServer: ${{ parameters.githubServer }}
           argoNS: ${{ parameters.argoNS }}
+          tektonNS: ${{ parameters.tektonNS }}
 
     - id: publish-github
       name: Publish Repository to GitHub
@@ -144,6 +152,7 @@ spec:
         namespace: ${{ parameters.argoNS }}
         repoUrl: https://${{ parameters.githubServer }}/${{ parameters.repoOwner }}/${{ parameters.name }}.git
         path: ./.tekton
+        destinationNamespace: ${{ parameters.tektonNS }}
 
   output:
     links:

@@ -2,7 +2,7 @@ apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:
   name: ${{ values.name }}-pipeline
-  namespace: ${{ values.argoNS }}
+  namespace: ${{ values.tektonNS }}
 spec:
   params:
     - name: gitRevision
