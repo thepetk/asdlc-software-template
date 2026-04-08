@@ -4,20 +4,46 @@ Agentic Software Development Lifecycle Software Templates based on [Paude](https
 
 ## Templates
 
-| Template                     | Catalog type       | Description                                                                                                              |
-| ---------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| **Paude Project Repository** | `paude-project`    | Create the shared GitHub repository that all agents in a workflow write to. Adds a Tekton pipeline for agent sequencing. |
-| **Paude Task**               | `paude-task`       | Define a task — title, description, objectives, and acceptance criteria — that drives an agent's TASK.md.                |
-| **Paude Agent Role**         | `paude-agent-role` | Define a reusable agent persona: a system prompt and agent type (Claude, Gemini, or Cursor).                             |
-| **Paude Agent**              | `paude-agent`      | Deploy a paude agent session on OpenShift. Binds a Role, a Task, and a Paude Project Repository together.                |
+| Template                     | Catalog type       | Description                                                                                                                         |
+| ---------------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| **Paude Project Repository** | `paude-project`    | Create the shared GitHub repository that all agents in a workflow write to. Adds a Pipelines as Code pipeline for agent sequencing. |
+| **Paude Task**               | `paude-task`       | Define a task — title, description, objectives, and acceptance criteria — that drives an agent's TASK.md.                           |
+| **Paude Agent Role**         | `paude-agent-role` | Define a reusable agent persona: a system prompt and agent type (Claude, Gemini, or Cursor).                                        |
+| **Paude Agent**              | `paude-agent`      | Deploy a paude agent session on OpenShift. Binds a Role, a Task, and a Paude Project Repository together.                           |
 
 ## Prerequisites
 
 - Red Hat Developer Hub 1.4+ with the Scaffolder plugin enabled
 - GitHub integration configured in RHDH
 - ArgoCD instance registered in RHDH (`argocd:create-resources` action must be available — RHDH built-in)
-- Tekton Pipelines installed and integrated in the RHDH instance
+- **OpenShift Pipelines with Pipelines as Code (PaC) enabled** on the cluster
+- A GitHub App (or token) configured in PaC
 - An OpenShift cluster where agents will run
+
+## Secrets
+
+Before scaffolding a Paude Project Repository, a cluster admin must create a Kubernetes Secret in the target ArgoCD namespace. This secret provides the GitHub token and webhook secret that Pipelines as Code uses to validate and respond to webhook events.
+
+### Required secret
+
+**Name:** `pipelines-as-code-secret`
+**Namespace:** the ArgoCD namespace you enter in the template (`argoNS`, e.g. `openshift-gitops`)
+
+| Key              | Description                                                                                           |
+| ---------------- | ----------------------------------------------------------------------------------------------------- |
+| `provider.token` | GitHub Personal Access Token (or GitHub App installation token) with `repo` and `checks:write` scopes |
+| `webhook.secret` | Random string set as the **Webhook secret** when configuring the GitHub App or repository webhook     |
+
+**Create the secret:**
+
+```bash
+oc create secret generic pipelines-as-code-secret \
+  -n <argoNS> \
+  --from-literal=provider.token=<github-token> \
+  --from-literal=webhook.secret=<webhook-secret>
+```
+
+For detailed cluster-admin instructions (GitHub App setup, multi-namespace configuration), see [docs/cluster-admin-setup.md](docs/cluster-admin-setup.md).
 
 ## Usage
 
@@ -29,10 +55,10 @@ The templates are designed to be used in this order:
 
 Run the **Paude Project Repository** template. It will:
 
-1. Create a GitHub repo with a Tekton `EventListener` and `Pipeline` under `.tekton/`
+1. Create a GitHub repo with a Pipelines as Code `Repository` CRD and annotated `PipelineRun` under `.tekton/`
 2. Create an empty `pipeline-config.yaml` (populated automatically as agents are created)
 3. Register the project as a `paude-project` component in the RHDH catalog
-4. Create an ArgoCD application that keeps the Tekton resources in sync via GitOps
+4. Create an ArgoCD application that keeps the `.tekton/` resources in sync via GitOps
 
 #### Create Roles and Tasks
 
@@ -60,7 +86,7 @@ Run the **Paude Agent** template for each agent in the workflow. It will:
 4. Create an ArgoCD application pointing at `manifests/` — ArgoCD provisions the session automatically
 5. Open a PR on the Paude Project repo to append the agent to `pipeline-config.yaml`
 
-ArgoCD syncs the manifests, triggering an image build. The session starts (`replicas: 1`) when the user runs `paude start <name>` or when the Tekton pipeline triggers it.
+ArgoCD syncs the manifests, triggering an image build. The session starts (`replicas: 1`) when the user runs `paude start <name>` or when the Pipelines as Code pipeline triggers it.
 
 ### Supported agent types
 

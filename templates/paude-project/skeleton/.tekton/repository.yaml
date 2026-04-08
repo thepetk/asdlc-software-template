@@ -1,0 +1,14 @@
+apiVersion: pipelinesascode.tekton.dev/v1alpha1
+kind: Repository
+metadata:
+  name: ${{ values.name }}
+  namespace: ${{ values.argoNS }}
+spec:
+  url: https://${{ values.githubServer }}/${{ values.repoOwner }}/${{ values.name }}
+  git_provider:
+    secret:
+      name: pipelines-as-code-secret
+      key: provider.token
+    webhook_secret:
+      name: pipelines-as-code-secret
+      key: webhook.secret
