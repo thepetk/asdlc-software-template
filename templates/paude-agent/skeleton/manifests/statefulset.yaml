@@ -24,11 +24,35 @@ spec:
     spec:
       automountServiceAccountToken: false
       enableServiceLinks: false
+      initContainers:
+        - name: inject-credentials
+          image: registry.access.redhat.com/ubi9/ubi-micro:latest
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              mkdir -p /credentials/${{ values.agentType }}
+              for f in /secret/*; do
+                filename=$(basename "$f")
+                case "$filename" in
+                  gitconfig|gitignore-global)
+                    cp "$f" /credentials/"$filename"
+                    ;;
+                  *)
+                    cp "$f" /credentials/${{ values.agentType }}/"$filename"
+                    ;;
+                esac
+              done
+              touch /credentials/.ready
+          volumeMounts:
+            - name: credentials-secret
+              mountPath: /secret
+              readOnly: true
+            - name: credentials
+              mountPath: /credentials
       containers:
         - name: agent
-          image: ${{ values.name }}:latest
+          image: image-registry.openshift-image-registry.svc:5000/${{ values.namespace }}/${{ values.name }}:latest
           imagePullPolicy: Always
-          command: ["tini", "--", "sleep", "infinity"]
           env:
             - name: PAUDE_WORKSPACE
               value: /pvc/workspace
@@ -71,4 +95,7 @@ spec:
           emptyDir:
             medium: Memory
             sizeLimit: 100Mi
+        - name: credentials-secret
+          secret:
+            secretName: ${{ values.agentType }}-secrets
   volumeClaimTemplates: []
