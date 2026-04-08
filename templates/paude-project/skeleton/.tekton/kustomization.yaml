@@ -1,0 +1,7 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# ArgoCD uses this file to determine what to sync.
+# Only the Repository CRD is managed by ArgoCD — pipelinerun.yaml is read
+# directly from Git by Pipelines as Code and must not be applied by ArgoCD.
+resources:
+  - repository.yaml

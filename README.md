@@ -77,14 +77,14 @@ Run the **Paude Agent** template for each agent in the workflow. It will:
 
 1. Resolve the selected Role, Task, and Project Repository from the catalog
 2. Create a GitOps repository containing:
-   - `build/Dockerfile` — installs the agent onto the base image
+   - `agent/Dockerfile` — installs the agent onto the base image along with entrypoint scripts
    - `manifests/` — StatefulSet (`replicas: 0`), BuildConfig, ImageStream, PVC, NetworkPolicy
    - `role/CLAUDE.md` — system prompt from the Role entity
    - `task/TASK.md` — task description, objectives, and acceptance criteria from the Task entity
    - `paude.json` — network domain allowlist and extra packages
 3. Register the agent as a `paude-agent` component in the catalog (with `dependsOn` links to its Role, Task, and Project)
 4. Create an ArgoCD application pointing at `manifests/` — ArgoCD provisions the session automatically
-5. Open a PR on the Paude Project repo to append the agent to `pipeline-config.yaml`
+5. Open a PR on the Paude Project repo to add `agents/<name>.yaml` — the per-agent trigger config consumed by the pipeline
 
 ArgoCD syncs the manifests, triggering an image build. The session starts (`replicas: 1`) when the user runs `paude start <name>` or when the Pipelines as Code pipeline triggers it.
 
