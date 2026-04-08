@@ -257,7 +257,6 @@ spec:
       input:
         appName: ${{ parameters.name }}
         argoInstance: ${{ parameters.argoInstance }}
-        projectName: ${{ parameters.name }}
         namespace: ${{ parameters.argoNS }}
         repoUrl: https://${{ parameters.githubServer }}/${{ parameters.repoOwner }}/${{ parameters.repoName }}.git
         path: ./manifests

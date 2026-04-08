@@ -149,10 +149,10 @@ spec:
       input:
         appName: ${{ parameters.name }}-tekton
         argoInstance: ${{ parameters.argoInstance }}
-        projectName: ${{ parameters.name }}-tekton
         namespace: ${{ parameters.argoNS }}
         repoUrl: https://${{ parameters.githubServer }}/${{ parameters.repoOwner }}/${{ parameters.name }}.git
         path: ./.tekton
+
 
   output:
     links:
