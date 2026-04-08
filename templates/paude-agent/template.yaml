@@ -261,7 +261,6 @@ spec:
         namespace: ${{ parameters.argoNS }}
         repoUrl: https://${{ parameters.githubServer }}/${{ parameters.repoOwner }}/${{ parameters.repoName }}.git
         path: ./manifests
-        destinationNamespace: ${{ parameters.namespace }}
 
     - id: fetch-pipeline-entry
       name: Render Pipeline Entry

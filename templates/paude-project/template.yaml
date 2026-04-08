@@ -152,7 +152,6 @@ spec:
         namespace: ${{ parameters.argoNS }}
         repoUrl: https://${{ parameters.githubServer }}/${{ parameters.repoOwner }}/${{ parameters.name }}.git
         path: ./.tekton
-        destinationNamespace: ${{ parameters.tektonNS }}
 
   output:
     links:
