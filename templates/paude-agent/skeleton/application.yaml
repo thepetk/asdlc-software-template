@@ -10,7 +10,7 @@ spec:
   source:
     repoURL: ${{ values.repoURL }}.git
     targetRevision: ${{ values.branch }}
-    path: manifests
+    path: ./app-of-apps
   destination:
     server: https://kubernetes.default.svc
     namespace: ${{ values.namespace }}
@@ -24,9 +24,3 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - PruneLast=true
-  ignoreDifferences:
-    - group: apps
-      kind: StatefulSet
-      jsonPointers:
-        - /spec/replicas
-        - /spec/template/spec/containers/0/env

@@ -259,7 +259,7 @@ spec:
         argoInstance: ${{ parameters.argoInstance }}
         namespace: ${{ parameters.argoNS }}
         repoUrl: https://${{ parameters.githubServer }}/${{ parameters.repoOwner }}/${{ parameters.repoName }}.git
-        path: ./argocd
+        path: ./app-of-apps
 
     - id: fetch-pipeline-entry
       name: Render Pipeline Entry
