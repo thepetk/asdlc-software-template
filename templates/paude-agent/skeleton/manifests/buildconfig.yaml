@@ -12,7 +12,7 @@ spec:
     git:
       uri: ${{ values.repoURL }}
       ref: ${{ values.branch }}
-    contextDir: build
+    contextDir: agent
   strategy:
     type: Docker
     dockerStrategy:
